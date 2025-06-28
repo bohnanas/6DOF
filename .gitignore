@@ -1,0 +1,49 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Logs and debug
+*.log
+*.out
+*.err
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.so
+
+# Blender or modeling
+*.blend1
+*.blend2
+*.fbx
+*.obj
+*.mtl
+*.bak
+
+# Executables
+*.exe
+*.dll
+*.app
+
+# Dependency files (if you want to keep them local-only)
+*.env
+.env
+*.yml
+*.yaml
