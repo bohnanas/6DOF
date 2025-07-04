@@ -1,50 +1,61 @@
+# Import Libraries
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import ussa1976
 
+# Import partner files
 from numerical_integrators import RK4
 from governing_equations import flat_earth_eom
+from vehicle_models.sphere import sphere
 
 #=====================================================================================================
 # INITIALIZE SIMULATION
 #=====================================================================================================
 
-# Define vehicle (sphere for now)
-r_sphere_m = 0.08
-m_sphere_kg = 5
-I_sphere_kgm2 = 0.4 * m_sphere_kg * r_sphere_m**2
+# Get atmospheric tables
+atmosphere = ussa1976.compute()
 
-vmod = {
-    "m_kg" : m_sphere_kg, \
-    "Ixx_b_kgm2" : I_sphere_kgm2, \
-    "Iyy_b_kgm2" : I_sphere_kgm2, \
-    "Izz_b_kgm2" : I_sphere_kgm2, \
-    "Ixz_b_kgm2" : 0, \
-    "Ixy_b_kgm2" : 0, \
-    "Iyz_b_kgm2" : 0 }
+# Store atmospheric vectors of interest into a dictionary
+alt_m = atmosphere["z"].values # altitude
+rho_kgpm3 = atmosphere["rho"].values # density
+c_mps = atmosphere["cs"].values # speed of sound
+g_mps2 = ussa1976.core.compute_gravity(alt_m) 
 
-# Set initial state
-u0_b_mps = 0
+amod = {
+    "alt_m"     : alt_m,
+    "rho_kgpm3" : rho_kgpm3,
+    "c_mps"     : c_mps,
+    "g_mps2"    : g_mps2
+}
+
+# Get vehicle model
+vmod = sphere()
+
+print(f"Analytical terminal velocity: {vmod['Vterm_mps']:.2f} m/s") # print the terminal velocity
+
+# Set initial condition
+u0_b_mps = 0.00001 # set small to avoid dividing by zero in AoA and Sideslip
 v0_b_mps = 0
 w0_b_mps = 0
-p0_b_mps = 0
-q0_b_mps = 0
-r0_b_mps = 0
-phi0_rad = 0
-theta0_rad = 90 * math.pi / 180
-psi0_rad = 0
+p0_b_rps = 0
+q0_b_rps = 0
+r0_b_rps = 0
+phi0_rad = 0 * math.pi / 180
+theta0_rad = 0 * math.pi / 180
+psi0_rad = 0 * math.pi / 180
 p10_NED_m = 0
 p20_NED_m = 0
-p30_NED_m = 0
+p30_NED_m = -30000
 
-# Put initial state into an array
+# Put initial conditions into an array
 x0 = np.array([
     u0_b_mps,   # x-axis body frame velocity (m/s)
     v0_b_mps,   # y-axis body frame velocity (m/s)
     w0_b_mps,   # z-axis body frame velocity (m/s)
-    p0_b_mps,   # roll rate (rad/s)
-    q0_b_mps,   # pitch rate (rad/s)
-    r0_b_mps,   # yaw rate (rad/s)
+    p0_b_rps,   # roll rate (rad/s)
+    q0_b_rps,   # pitch rate (rad/s)
+    r0_b_rps,   # yaw rate (rad/s)
     phi0_rad,   # roll angle (rad)
     theta0_rad, # pitch angle (rad)
     psi0_rad,   # yaw angle (rad)
@@ -56,12 +67,16 @@ x0 = np.array([
 # Get number of elements in x0
 nx0 = x0.size
 
-# Set time conditions for fourth-order Runge Kutta
+#=====================================================================================================
+# SIMULATE NUMERICALLY WITH FOURTH ORDER RUNGE KUTTA INTEGRATION
+#=====================================================================================================
+
+# Set time conditions for integrator
 t0_s = 0.0  # initial time
-tf_s = 10.0 # final time (simulation length)
+tf_s = 185.0 # final time (simulation length)
 h_s = 0.01  # time step
 
-# Declare solution array
+# Initialize solution matrix
 t_s = np.arange(t0_s, tf_s + h_s, h_s)      # array of time steps from initial to final, incremented by h
 nt_s = t_s.size                             # number of time steps
 x = np.empty((nx0, nt_s), dtype = float)    # solution array where state vector is stored
@@ -69,97 +84,88 @@ x = np.empty((nx0, nt_s), dtype = float)    # solution array where state vector 
 # Assign initial condition x0 the solution array x
 x[:,0] = x0 # sets the first column of the solution array, x, to the initial state, x0, at time t_s[0]
 
-#=====================================================================================================
-# SIMULATE NUMERICALLY WITH FOURTH ORDER RUNGE KUTTA INTEGRATION
-#=====================================================================================================
-
 # Calls on RK4 function in RK4 file to do the integration over our defined time conditions
 # Sends: governing equation function, initial state vector, initial time, final time, step size, and vehicle model
 # Returns: array of time steps and the state at each time step
-t_s, x = RK4.rk4(flat_earth_eom.flat_earth_eom, x0, t0_s, tf_s, h_s, vmod)
+t_s, x = RK4.rk4(flat_earth_eom.flat_earth_eom, x0, t0_s, tf_s, h_s, vmod, amod)
 
 #=====================================================================================================
-# PLOT DATA
+# DATA POST PROCESSING
 #=====================================================================================================
 
 x = np.array(x)
 x = x.T
 
-# Create subplots and layout
-fig, axes = plt.subplots(3, 3, figsize=(10,6)) # 3 rows, 3 columns
+print(f"Numerical Terminal Velocity: {x[2,-1]:.2f} m/s")
+
+#=====================================================================================================
+# PLOT DATA
+#=====================================================================================================
+
+fig, axes = plt.subplots(3, 3, figsize=(20,10))
 fig.set_facecolor('black')
 
-# Plot body x velocity, u
-axes[0, 0].plot(t_s, x[0,:], color='yellow')
-axes[0, 0].set_xlabel('Time (s)', color='white')
-axes[0, 0].set_ylabel('u (m/s)', color='white')
-axes[0, 0].set_facecolor('black')
-axes[0, 0].grid(True)
-axes[0, 0].tick_params(colors='white')
+# Variable names and labels for the y-axis
+var_labels = [
+    'u (m/s)', 'v (m/s)', 'w (m/s)',
+    'Roll rate (rad/s)', 'Pitch rate (rad/s)', 'Yaw rate (rad/s)',
+    'Roll angle (rad)', 'Pitch angle (rad)', 'Yaw angle (rad)'
+]
 
-# Plot body y velocity, v
-axes[0, 1].plot(t_s, x[1,:], color='yellow')
-axes[0, 1].set_xlabel('Time (s)', color='white')
-axes[0, 1].set_ylabel('v (m/s)', color='white')
-axes[0, 1].set_facecolor('black')
-axes[0, 1].grid(True)
-axes[0, 1].tick_params(colors='white')
+for i in range(9):
+    ax = axes[i // 3, i % 3]
+    ax.plot(t_s, x[i, :], color='yellow')
+    ax.set_xlabel('Time (s)', color='white')
+    ax.set_ylabel(var_labels[i], color='white')
+    ax.set_facecolor('black')
+    ax.grid(True)
+    ax.tick_params(colors='white')
 
-# Plot body z velocity, w
-axes[0, 2].plot(t_s, x[2,:], color='yellow')
-axes[0, 2].set_xlabel('Time (s)', color='white')
-axes[0, 2].set_ylabel('w (m/s)', color='white')
-axes[0, 2].set_facecolor('black')
-axes[0, 2].grid(True)
-axes[0, 2].tick_params(colors='white')
+fig2, axes2 = plt.subplots(2, 3, figsize=(17,10), constrained_layout=True)
+fig2.set_facecolor('black')
 
-# Plot roll rate, p
-axes[1, 0].plot(t_s, x[3,:], color='yellow')
-axes[1, 0].set_xlabel('Time (s)', color='white')
-axes[1, 0].set_ylabel('Roll rate (rad/s)', color='white')
-axes[1, 0].set_facecolor('black')
-axes[1, 0].grid(True)
-axes[1, 0].tick_params(colors='white')
+pos_labels = ['North (m)', 'East (m)', 'Altitude (m)']
 
-# Plot pitch rate, q
-axes[1, 1].plot(t_s, x[4,:], color='yellow')
-axes[1, 1].set_xlabel('Time (s)', color='white')
-axes[1, 1].set_ylabel('Pitch rate (rad/s)', color='white')
-axes[1, 1].set_facecolor('black')
-axes[1, 1].grid(True)
-axes[1, 1].tick_params(colors='white')
+north = x[9,:]
+east = x[10,:]
+altitude = -x[11,:]  # invert down to altitude
 
-# Plot yaw rate, r
-axes[1, 2].plot(t_s, x[5,:], color='yellow')
-axes[1, 2].set_xlabel('Time (s)', color='white')
-axes[1, 2].set_ylabel('Yaw rate (rad/s)', color='white')
-axes[1, 2].set_facecolor('black')
-axes[1, 2].grid(True)
-axes[1, 2].tick_params(colors='white')
+# --- TOP ROW: position vs time ---
+for i in range(3):
+    ax = axes2[0, i]
+    if i == 2:
+        ax.plot(t_s, altitude, color='yellow')
+    else:
+        ax.plot(t_s, x[9+i,:], color='yellow')
+    ax.set_xlabel('Time (s)', color='white')
+    ax.set_ylabel(pos_labels[i], color='white')
+    ax.set_facecolor('black')
+    ax.grid(True)
+    ax.tick_params(colors='white')
+    plt.setp(ax.get_xticklabels(), rotation=30, ha='right', fontsize=8)
 
-# Plot roll angle, phi
-axes[2, 0].plot(t_s, x[6,:], color='yellow')
-axes[2, 0].set_xlabel('Time (s)', color='white')
-axes[2, 0].set_ylabel('Roll angle (rad)', color='white')
-axes[2, 0].set_facecolor('black')
-axes[2, 0].grid(True)
-axes[2, 0].tick_params(colors='white')
+# --- BOTTOM ROW: position vs position ---
+pos_pos_data = [
+    (east, north),     # North vs East
+    (east, altitude),  # Altitude vs East
+    (north, altitude)  # Altitude vs North
+]
 
-# Plot pitch angle, theta
-axes[2, 1].plot(t_s, x[7,:], color='yellow')
-axes[2, 1].set_xlabel('Time (s)', color='white')
-axes[2, 1].set_ylabel('Pitch angle (rad)', color='white')
-axes[2, 1].set_facecolor('black')
-axes[2, 1].grid(True)
-axes[2, 1].tick_params(colors='white')
+pos_pos_labels = [
+    ('East (m)', 'North (m)'),
+    ('East (m)', 'Altitude (m)'),
+    ('North (m)', 'Altitude (m)')
+]
 
-# Plot yaw angle, psi
-axes[2, 2].plot(t_s, x[8,:], color='yellow')
-axes[2, 2].set_xlabel('Time (s)', color='white')
-axes[2, 2].set_ylabel('Yaw angle (rad)', color='white')
-axes[2, 2].set_facecolor('black')
-axes[2, 2].grid(True)
-axes[2, 2].tick_params(colors='white')
+for i in range(3):
+    ax = axes2[1, i]
+    xdata, ydata = pos_pos_data[i]
+    ax.plot(xdata, ydata, color='yellow')
+    ax.set_xlabel(pos_pos_labels[i][0], color='white')
+    ax.set_ylabel(pos_pos_labels[i][1], color='white')
+    ax.set_facecolor('black')
+    ax.grid(True)
+    ax.tick_params(colors='white')
 
 plt.tight_layout()
 plt.show()
