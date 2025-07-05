@@ -73,9 +73,16 @@ def flat_earth_eom(t, x, vmod, amod):
     Z_b_N = thrust_bz_N - lift_N * math.cos(alpha_rad) - drag_N * math.sin(alpha_rad) * math.cos(beta_rad) - side_N * math.sin(alpha_rad) * math.sin(beta_rad)
 
     # external moments
-    L_b_Nm = 0 # (units = Newton Meter)
-    M_b_Nm = 0 # (units = Newton Meter)
-    N_b_Nm = 0 # (units = Newton Meter)
+    b = vmod["b"]
+    c = vmod["cbar"]
+    aref_m2 = b * c
+    clp = vmod["C_l_p"]
+    cmq = vmod["C_m_q"]
+    cnr = vmod["C_n_r"]
+    const = 1 / (2 * true_airspeed_mps)
+    L_b_Nm = (const * clp * p_b_rps * b) * qbar_kgpms2 * aref_m2 * b # (units = Newton Meter)
+    M_b_Nm = (const * cmq * q_b_rps * c) * qbar_kgpms2 * aref_m2 * c # (units = Newton Meter)
+    N_b_Nm = (const * cnr * r_b_rps * b) * qbar_kgpms2 * aref_m2 * b # (units = Newton Meter)
 
     ##################################################################################################################
     # EQUATIONS OF MOTION

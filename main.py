@@ -15,7 +15,7 @@ from vehicle_models import bricks
 #=====================================================================================================
 
 # Set initial condition
-u0_b_mps = 0
+u0_b_mps = 1e-10                  # set small to avoid dividing by zero in moment calculations
 v0_b_mps = 0
 w0_b_mps = 0
 p0_b_rps = 10 * math.pi / 180     # deg/s to rad/s
@@ -41,7 +41,7 @@ vmod = bricks.NASA_brick()
 #=====================================================================================================
 # enable data saving & allocate the directory and format (.npy)
 save_data = 'on'
-save_dir = './my_saved_data/atmos02/atmos02.npy'
+save_dir = './my_saved_data/atmos03/atmos03.npy'
 
 # enable saving of certain plots
 save_6dof_plot = 'off'
