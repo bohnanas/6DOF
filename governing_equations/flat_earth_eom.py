@@ -41,34 +41,36 @@ def flat_earth_eom(t, x, vmod, amod):
     # Atmospheric model
     h_m = -p3_NED_m # current altitude
     rho_kgpm3 = np.interp(h_m, amod["alt_m"], amod["rho_kgpm3"]) # density as a function of altitude
-    # rho_kgpm3 = 1.2 # density as a constant (sea-level)
     c_mps = np.interp(h_m, amod["alt_m"], amod["c_mps"], h_m)
 
-    # AoA, Sideslip
+    # AoA, Sideslip, Mach
     true_airspeed_mps = math.sqrt(u_b_mps**2 + v_b_mps**2 + w_b_mps**2)
     qbar_kgpms2 = 0.5 * rho_kgpm3 * true_airspeed_mps**2  
+    mach = true_airspeed_mps / c_mps
 
     alpha_rad = np.atan2(w_b_mps, u_b_mps) 
-    beta_rad = np.asin(v_b_mps / true_airspeed_mps)
+
+    if true_airspeed_mps == 0:
+        v_over_VT = 0
+    else:
+        v_over_VT = v_b_mps / true_airspeed_mps
+    beta_rad = np.asin(v_over_VT)
 
     # Lift, Drag, Sideforce, Thrust
-    lift_N = 0 # (units = Newton)
-    drag_N = vmod["CD"] * qbar_kgpms2 * vmod["Aref_m2"] # (units = Newton)
-    side_N = 0 # (units = Newton)
+    lift_N = 0 
+    drag_N = 0
+    side_N = 0 
     thrust_bx_N = 0 # thrust in body x axis
     thrust_by_N = 0 # thrust in body y axis
     thrust_bz_N = 0 # thrust in body z axis
-
-    # gravity (assuming constant)
-    # gz_n_mps2 = 9.81
 
     # gravity (calculating as a function of altitude)
     gz_n_mps2 = np.interp(h_m, amod["alt_m"], amod["g_mps2"])
 
     # external forces
-    X_b_N = thrust_bx_N + lift_N * math.sin(alpha_rad) - drag_N * math.cos(alpha_rad) * math.cos(beta_rad) # (units = Newton)
-    Y_b_N = thrust_by_N - drag_N * math.sin(beta_rad) + side_N * math.cos(beta_rad) # (units = Newton)
-    Z_b_N = thrust_bz_N - lift_N * math.cos(alpha_rad) - drag_N * math.sin(alpha_rad) * math.cos(beta_rad) - side_N * math.sin(alpha_rad) * math.sin(beta_rad) # (units = Newton)
+    X_b_N = thrust_bx_N + lift_N * math.sin(alpha_rad) - drag_N * math.cos(alpha_rad) * math.cos(beta_rad) 
+    Y_b_N = thrust_by_N - drag_N * math.sin(beta_rad) + side_N * math.cos(beta_rad) 
+    Z_b_N = thrust_bz_N - lift_N * math.cos(alpha_rad) - drag_N * math.sin(alpha_rad) * math.cos(beta_rad) - side_N * math.sin(alpha_rad) * math.sin(beta_rad)
 
     # external moments
     L_b_Nm = 0 # (units = Newton Meter)
@@ -98,7 +100,7 @@ def flat_earth_eom(t, x, vmod, amod):
     dx[4] = (1 / Iyy_b_kgm2) * (M_b_Nm - ((r_b_rps * p_b_rps) * (Ixx_b_kgm2 - Izz_b_kgm2)) - ((Ixz_b_kgm2) * (p_b_rps**2 - r_b_rps**2)))
 
     # r dot
-    dx[5] = (1 / denom) * (Ixz_b_kgm2 * L_b_Nm + Ixx_b_kgm2 * N_b_Nm - ((Ixz_b_kgm2 * r_b_rps * q_b_rps) * (Ixx_b_kgm2 - Iyy_b_kgm2 + Izz_b_kgm2)) - ((p_b_rps * r_b_rps) * (Ixx_b_kgm2**2 - Ixx_b_kgm2 * Iyy_b_kgm2 + Ixz_b_kgm2**2)))
+    dx[5] = (1 / denom) * (Ixz_b_kgm2 * L_b_Nm + Ixx_b_kgm2 * N_b_Nm - ((Ixz_b_kgm2 * r_b_rps * q_b_rps) * (Ixx_b_kgm2 - Iyy_b_kgm2 + Izz_b_kgm2)) + ((p_b_rps * q_b_rps) * (Ixx_b_kgm2**2 - Ixx_b_kgm2 * Iyy_b_kgm2 + Ixz_b_kgm2**2)))
 
     # EULER KINEMATIC EQUATIONS
     # phi dot

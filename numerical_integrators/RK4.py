@@ -1,39 +1,27 @@
-def rk4(f, y0, t0, t_end, h, vmod, amod):
+import numpy as np
+
+def rk4(f, t, x, h, vmod, amod):
     ######################################################################################
     # Fourth-order Runge-Kutta ODE solver.
     
     # Parameters:
     # f: governing equations
-    # y0: initial value of y (can be scalar or NumPy array)
-    # t0: initial time
-    # t_end: final time
+    # t: time
+    # x: state
     # h: time step size
     # vmod: vehicle model
     # amod: atmospheric model
     
     # Returns:
-    # t_values: list of time points
-    # y_values: list of y values at each time step
+    # t: time
+    # x: state solution
     #######################################################################################
 
-    t = t0
-    y = y0
-    t_values = [t]
-    y_values = [y]
+    for i in range(1, len(t)):
+        k1 = h * f(t[i-1], x[:,i-1], vmod, amod)
+        k2 = h * f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k1, vmod, amod)
+        k3 = h * f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k2, vmod, amod)
+        k4 = h * f(t[i-1] + h, x[:,i-1] + k3, vmod, amod) 
+        x[:,i] = x[:,i-1] + 1.0/6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
-    while t < t_end:
-        if t + h > t_end:  # adjust final step to hit t_end exactly
-            h = t_end - t
-
-        k1 = f(t, y, vmod, amod)
-        k2 = f(t + h/2, y + h/2 * k1, vmod, amod)
-        k3 = f(t + h/2, y + h/2 * k2, vmod, amod)
-        k4 = f(t + h, y + h * k3, vmod, amod)
-
-        y = y + h/6 * (k1 + 2*k2 + 2*k3 + k4)
-        t = t + h
-
-        t_values.append(t)
-        y_values.append(y)
-
-    return t_values, y_values
+    return t, x

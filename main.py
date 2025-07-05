@@ -7,7 +7,60 @@ import ussa1976
 # Import partner files
 from numerical_integrators import RK4
 from governing_equations import flat_earth_eom
-from vehicle_models.sphere import sphere
+from vehicle_models import spheres
+from vehicle_models import bricks
+
+#=====================================================================================================
+# CHANGE ME
+#=====================================================================================================
+
+# Set initial condition
+u0_b_mps = 0
+v0_b_mps = 0
+w0_b_mps = 0
+p0_b_rps = 10 * math.pi / 180     # deg/s to rad/s
+q0_b_rps = 20 * math.pi / 180     # deg/s to rad/s
+r0_b_rps = 30 * math.pi / 180     # deg/s to rad/s
+phi0_rad = 0 * math.pi / 180      # deg to rad
+theta0_rad = 0 * math.pi / 180    # deg to rad
+psi0_rad = 0 * math.pi / 180      # deg to rad
+p10_NED_m = 0
+p20_NED_m = 0
+p30_NED_m = -30000 / 3.281         # ft to m
+
+# Set time conditions for integrator
+t0_s = 0.0  # initial time
+tf_s = 30.0 # final time (simulation length)
+h_s = 0.01  # time step
+
+# Get vehicle model
+vmod = bricks.NASA_brick()
+
+#=====================================================================================================
+# SETUP DATA SAVING 
+#=====================================================================================================
+# enable data saving & allocate the directory and format (.npy)
+save_data = 'on'
+save_dir = './my_saved_data/atmos02/atmos02.npy'
+
+# enable saving of certain plots
+save_6dof_plot = 'off'
+save_euler_angle_plot = 'off'
+save_NED_plot = 'off'
+save_air_data_plot = 'off'
+
+# name plots and save them to a folder
+name_6dof_plot = '6dof.png'
+save_6dof_plot_dir = './my_saved_data/atmos01/saved_plots/' + name_6dof_plot
+
+name_euler_angle_plot = 'euler.png'
+save_euler_angle_plot_dir = './my_saved_data/atmos01/saved_plots/' + name_euler_angle_plot
+
+name_NED_plot = 'NED.png'
+save_NED_plot_dir = './my_saved_data/atmos01/saved_plots/' + name_NED_plot
+
+name_air_data_plot = 'air_data.png'
+save_air_data_plot_dir = './my_saved_data/atmos01/saved_plots/' + name_air_data_plot
 
 #=====================================================================================================
 # INITIALIZE SIMULATION
@@ -28,25 +81,6 @@ amod = {
     "c_mps"     : c_mps,
     "g_mps2"    : g_mps2
 }
-
-# Get vehicle model
-vmod = sphere()
-
-print(f"Analytical terminal velocity: {vmod['Vterm_mps']:.2f} m/s") # print the terminal velocity
-
-# Set initial condition
-u0_b_mps = 0.00001 # set small to avoid dividing by zero in AoA and Sideslip
-v0_b_mps = 0
-w0_b_mps = 0
-p0_b_rps = 0
-q0_b_rps = 0
-r0_b_rps = 0
-phi0_rad = 0 * math.pi / 180
-theta0_rad = 0 * math.pi / 180
-psi0_rad = 0 * math.pi / 180
-p10_NED_m = 0
-p20_NED_m = 0
-p30_NED_m = -30000
 
 # Put initial conditions into an array
 x0 = np.array([
@@ -71,11 +105,6 @@ nx0 = x0.size
 # SIMULATE NUMERICALLY WITH FOURTH ORDER RUNGE KUTTA INTEGRATION
 #=====================================================================================================
 
-# Set time conditions for integrator
-t0_s = 0.0  # initial time
-tf_s = 185.0 # final time (simulation length)
-h_s = 0.01  # time step
-
 # Initialize solution matrix
 t_s = np.arange(t0_s, tf_s + h_s, h_s)      # array of time steps from initial to final, incremented by h
 nt_s = t_s.size                             # number of time steps
@@ -87,85 +116,321 @@ x[:,0] = x0 # sets the first column of the solution array, x, to the initial sta
 # Calls on RK4 function in RK4 file to do the integration over our defined time conditions
 # Sends: governing equation function, initial state vector, initial time, final time, step size, and vehicle model
 # Returns: array of time steps and the state at each time step
-t_s, x = RK4.rk4(flat_earth_eom.flat_earth_eom, x0, t0_s, tf_s, h_s, vmod, amod)
+t_s, x = RK4.rk4(flat_earth_eom.flat_earth_eom, t_s, x, h_s, vmod, amod)
 
 #=====================================================================================================
 # DATA POST PROCESSING
 #=====================================================================================================
+# Preallocate variables
+Altitude_m  = np.zeros((nt_s,1))
+Cs_mps      = np.zeros((nt_s,1))
+Rho_kgpm3   = np.zeros((nt_s,1))
+C_phi       = np.zeros((nt_s,1))
+C_theta     = np.zeros((nt_s,1))
+C_psi       = np.zeros((nt_s,1))
+S_phi       = np.zeros((nt_s,1))
+S_theta     = np.zeros((nt_s,1))
+S_psi       = np.zeros((nt_s,1))
+T_theta     = np.zeros((nt_s,1))
+C_b2n_11    = np.zeros((nt_s,1))
+C_b2n_12    = np.zeros((nt_s,1))
+C_b2n_13    = np.zeros((nt_s,1))
+C_b2n_21    = np.zeros((nt_s,1))
+C_b2n_22    = np.zeros((nt_s,1))
+C_b2n_23    = np.zeros((nt_s,1))
+C_b2n_31    = np.zeros((nt_s,1))
+C_b2n_32    = np.zeros((nt_s,1))
+C_b2n_33    = np.zeros((nt_s,1))
+u_n_mps     = np.zeros((nt_s,1)) 
+v_n_mps     = np.zeros((nt_s,1))
+w_n_mps     = np.zeros((nt_s,1)) 
 
-x = np.array(x)
-x = x.T
+for i, element in enumerate(t_s):
+    Altitude_m[i,0] = -x[11,i]
+    Cs_mps[i,0]     = np.interp(Altitude_m[i,0], amod["alt_m"], amod["c_mps"])
+    Rho_kgpm3[i,0]  = np.interp(Altitude_m[i,0], amod["alt_m"], amod["rho_kgpm3"])
+    C_phi[i,0]      = math.cos(x[6,i])
+    C_theta[i,0]    = math.cos(x[7,i])
+    C_psi[i,0]      = math.cos(x[8,i])
+    S_phi[i,0]      = math.sin(x[6,i])
+    S_theta[i,0]    = math.sin(x[7,i])
+    S_psi[i,0]      = math.sin(x[8,i])
+    T_theta[i,0]    = math.tan(x[7,i])
+    C_b2n_11[i,0]   =  C_theta[i,0] * C_psi[i,0]
+    C_b2n_12[i,0]   = -C_phi[i,0] * S_psi[i,0] + S_phi[i,0] * S_theta[i,0] * C_psi[i,0]
+    C_b2n_13[i,0]   =  S_phi[i,0] * S_psi[i,0] + C_phi[i,0] * S_theta[i,0] * C_psi[i,0]
+    C_b2n_21[i,0]   =  C_theta[i,0] * S_psi[i,0]
+    C_b2n_22[i,0]   =  C_phi[i,0] * C_psi[i,0] + S_phi[i,0] * S_theta[i,0] * S_psi[i,0]
+    C_b2n_23[i,0]   = -S_phi[i,0] * C_psi[i,0] + C_phi[i,0] * S_theta[i,0] * S_psi[i,0]
+    C_b2n_31[i,0]   = -S_theta[i,0]
+    C_b2n_32[i,0]   =  S_phi[i,0] * C_theta[i,0]
+    C_b2n_33[i,0]   =  C_phi[i,0] * C_theta[i,0]
+    u_n_mps[i,0]    =  C_b2n_11[i,0] * x[0,i] + C_b2n_12[i,0] * x[1,i] + C_b2n_13[i,0] * x[2,i]
+    v_n_mps[i,0]    =  C_b2n_21[i,0] * x[0,i] + C_b2n_22[i,0] * x[1,i] + C_b2n_23[i,0] * x[2,i]
+    w_n_mps[i,0]    =  C_b2n_31[i,0] * x[0,i] + C_b2n_32[i,0] * x[1,i] + C_b2n_33[i,0] * x[2,i]
 
-print(f"Numerical Terminal Velocity: {x[2,-1]:.2f} m/s")
+# Airspeed
+True_Airspeed_mps  = np.zeros((nt_s,1))
+for i, element in enumerate(t_s):
+    True_Airspeed_mps[i,0] = math.sqrt(x[0,i]**2 + x[1,i]**2 + x[2,i]**2)
+    
+# Angle of attack
+Alpha_rad = np.zeros((nt_s,1))
+for i, element in enumerate(t_s):     
+    Alpha_rad[i,0] = np.atan2(x[2,i], x[0,i])
+    
+# Angle of side slip
+Beta_rad = np.zeros((nt_s,1))
+for i, element in enumerate(t_s):  
+    if True_Airspeed_mps[i,0] == 0:
+        v_over_VT = 0
+    else:
+        v_over_VT = x[1,i] / True_Airspeed_mps[i,0]
+    Beta_rad[i,0] = math.asin(v_over_VT)
+    
+# Mach Number
+Mach = np.zeros((nt_s,1))
+for i, element in enumerate(t_s):
+    Mach[i,0] = True_Airspeed_mps[i,0] / Cs_mps[i,0]
+
+#=====================================================================================================
+# SAVE DATA
+#=====================================================================================================
+
+# Combine state date with time and other post processed data
+t_s = t_s[:, np.newaxis]
+sim_data = np.concatenate( (t_s, x.T, Altitude_m, Cs_mps, Rho_kgpm3, Mach, Alpha_rad, \
+                            Beta_rad, True_Airspeed_mps, C_phi, C_theta, C_psi, S_phi, \
+                            S_theta, S_psi, T_theta), axis=1 )
+
+# Save the state data, x_combined
+if save_data.lower() == "on":
+    np.save(save_dir, sim_data)
 
 #=====================================================================================================
 # PLOT DATA
 #=====================================================================================================
 
-fig, axes = plt.subplots(3, 3, figsize=(20,10))
-fig.set_facecolor('black')
+#############################################
+# 6 DOF
+#############################################
+fig, axes = plt.subplots(2, 3, figsize=(10, 6))
+fig.set_facecolor('black')  
+title_suffix = f"{vmod['V_Name']}"
+title_prefix = "6 Degree of Freedom States\n"
+fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='yellow')
 
-# Variable names and labels for the y-axis
-var_labels = [
-    'u (m/s)', 'v (m/s)', 'w (m/s)',
-    'Roll rate (rad/s)', 'Pitch rate (rad/s)', 'Yaw rate (rad/s)',
-    'Roll angle (rad)', 'Pitch angle (rad)', 'Yaw angle (rad)'
-]
+# Axial velocity u^b_CM/n
+axes[0, 0].plot(t_s, x[0,:], color='yellow')
+axes[0, 0].set_xlabel('Time [s]', color='white')
+axes[0, 0].set_ylabel('u [m/s]', color='white')
+axes[0, 0].grid(True)
+axes[0, 0].set_facecolor('black')
+axes[0, 0].tick_params(colors = 'white')
 
-for i in range(9):
-    ax = axes[i // 3, i % 3]
-    ax.plot(t_s, x[i, :], color='yellow')
-    ax.set_xlabel('Time (s)', color='white')
-    ax.set_ylabel(var_labels[i], color='white')
-    ax.set_facecolor('black')
-    ax.grid(True)
-    ax.tick_params(colors='white')
+# y-axis velocity v^b_CM/n
+axes[0, 1].plot(t_s, x[1,:], color='yellow')
+axes[0, 1].set_xlabel('Time [s]', color='white')
+axes[0, 1].set_ylabel('v [m/s]', color='white')
+axes[0, 1].grid(True)
+axes[0, 1].set_facecolor('black')
+axes[0, 1].tick_params(colors = 'white')
 
-fig2, axes2 = plt.subplots(2, 3, figsize=(17,10), constrained_layout=True)
-fig2.set_facecolor('black')
+# z-axis velocity w^b_CM/n
+axes[0, 2].plot(t_s, x[2,:], color='yellow')
+axes[0, 2].set_xlabel('Time [s]', color='white')
+axes[0, 2].set_ylabel('w [m/s]', color='white')
+if np.linalg.norm(x[2,:]) < 1e-5:
+    axes[0,2].set_ylim(-0.05,0.05)
+axes[0, 2].grid(True)
+axes[0, 2].set_facecolor('black')
+axes[0, 2].tick_params(colors = 'white')
 
-pos_labels = ['North (m)', 'East (m)', 'Altitude (m)']
+# Roll rate p^b_b/n
+axes[1, 0].plot(t_s, (math.pi/180)*x[3,:], color='yellow')
+axes[1, 0].set_xlabel('Time [s]', color='white')
+axes[1, 0].set_ylabel('p [deg/s]', color='white')
+axes[1, 0].grid(True)
+axes[1, 0].set_facecolor('black')
+axes[1, 0].tick_params(colors = 'white')
 
-north = x[9,:]
-east = x[10,:]
-altitude = -x[11,:]  # invert down to altitude
+# Pitch rate q^b_b/n
+axes[1, 1].plot(t_s, (math.pi/180)*x[4,:], color='yellow')
+axes[1, 1].set_xlabel('Time [s]', color='white')
+axes[1, 1].set_ylabel('q [deg/s]', color='white')
+axes[1, 1].grid(True)
+axes[1, 1].set_facecolor('black')
+axes[1, 1].tick_params(colors = 'white')
 
-# --- TOP ROW: position vs time ---
-for i in range(3):
-    ax = axes2[0, i]
-    if i == 2:
-        ax.plot(t_s, altitude, color='yellow')
-    else:
-        ax.plot(t_s, x[9+i,:], color='yellow')
-    ax.set_xlabel('Time (s)', color='white')
-    ax.set_ylabel(pos_labels[i], color='white')
-    ax.set_facecolor('black')
-    ax.grid(True)
-    ax.tick_params(colors='white')
-    plt.setp(ax.get_xticklabels(), rotation=30, ha='right', fontsize=8)
-
-# --- BOTTOM ROW: position vs position ---
-pos_pos_data = [
-    (east, north),     # North vs East
-    (east, altitude),  # Altitude vs East
-    (north, altitude)  # Altitude vs North
-]
-
-pos_pos_labels = [
-    ('East (m)', 'North (m)'),
-    ('East (m)', 'Altitude (m)'),
-    ('North (m)', 'Altitude (m)')
-]
-
-for i in range(3):
-    ax = axes2[1, i]
-    xdata, ydata = pos_pos_data[i]
-    ax.plot(xdata, ydata, color='yellow')
-    ax.set_xlabel(pos_pos_labels[i][0], color='white')
-    ax.set_ylabel(pos_pos_labels[i][1], color='white')
-    ax.set_facecolor('black')
-    ax.grid(True)
-    ax.tick_params(colors='white')
+# Yaw rate r^b_b/n
+axes[1, 2].plot(t_s, (math.pi/180)*x[5,:], color='yellow')
+axes[1, 2].set_xlabel('Time [s]', color='white')
+axes[1, 2].set_ylabel('r [deg/s]', color='white')
+axes[1, 2].grid(True)
+axes[1, 2].set_facecolor('black')
+axes[1, 2].tick_params(colors = 'white')
 
 plt.tight_layout()
+if save_6dof_plot == "on":  
+    plt.savefig(save_6dof_plot_dir)
+plt.show(block=False)
+
+#############################################
+# EULER
+#############################################
+fig, axes = plt.subplots(1, 3, figsize=(10, 3))
+fig.set_facecolor('black')  
+title_suffix = f"{vmod["V_Name"]}"
+title_prefix = "Euler Angles (Attitude)\n"
+fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='yellow')
+
+# Roll angle, phi
+axes[0].plot(t_s, (math.pi/180)*x[6,:], color='yellow')
+axes[0].set_xlabel('Time [s]', color='white')
+axes[0].set_ylabel('Roll Angle [deg]', color='white')
+axes[0].grid(True)
+axes[0].set_facecolor('black')
+axes[0].tick_params(colors = 'white')
+
+# Pitch angle, theta
+axes[1].plot(t_s, (math.pi/180)*x[7,:], color='yellow')
+axes[1].set_xlabel('Time [s]', color='white')
+axes[1].set_ylabel('Pitch Angle [deg]', color='white')
+axes[1].grid(True)
+axes[1].set_facecolor('black')
+axes[1].tick_params(colors = 'white')
+
+# Yaw angle, theta
+axes[2].plot(t_s, (math.pi/180)*x[8,:], color='yellow')
+axes[2].set_xlabel('Time [s]', color='white')
+axes[2].set_ylabel('Yaw Angle [deg]', color='white')
+axes[2].grid(True)
+axes[2].set_facecolor('black')
+axes[2].tick_params(colors = 'white')
+
+plt.tight_layout()
+if save_euler_angle_plot == "on":  
+    plt.savefig(save_euler_angle_plot_dir)
+plt.show(block=False)
+
+#############################################
+# NED POSITION & VELOCITY
+#############################################
+fig, axes = plt.subplots(2, 3, figsize=(10, 6))
+fig.set_facecolor('black') 
+title_suffix = f"{vmod['V_Name']}"
+title_prefix = "Inertial Position and Velocity\n"
+fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='cyan')
+
+# North position p1^n_CM/T
+axes[0,0].plot(t_s, x[9,:], color='cyan')
+axes[0,0].set_xlabel('Time [s]', color='white')
+axes[0,0].set_ylabel('North [m]', color='white')
+if np.linalg.norm(x[9,:]) < 1e-5:
+    axes[0,0].set_ylim(-0.05,0.05)
+axes[0,0].grid(True)
+axes[0,0].set_facecolor('black')
+axes[0,0].tick_params(colors = 'white')
+
+# East position p2^n_CM/T
+axes[0,1].plot(t_s, x[10,:], color='cyan')
+axes[0,1].set_xlabel('Time [s]', color='white')
+axes[0,1].set_ylabel('East [m]', color='white')
+if np.linalg.norm(x[10,:]) < 1e-5:
+    axes[0,1].set_ylim(-0.05,0.05)
+axes[0,1].grid(True)
+axes[0,1].set_facecolor('black')
+axes[0,1].tick_params(colors = 'white')
+
+# Altitude
+axes[0,2].plot(t_s, -x[11,:], color='cyan')
+axes[0,2].set_xlabel('Time [s]', color='white')
+axes[0,2].set_ylabel('Altitude [m]', color='white')
+if np.linalg.norm(x[11,:]) < 1e-5:
+    axes[0,2].set_ylim(-0.05,0.05)
+axes[0,2].grid(True)
+axes[0,2].set_facecolor('black')
+axes[0,2].tick_params(colors = 'white')
+
+# u_n_mps
+axes[1,0].plot(t_s, u_n_mps, color='cyan')
+axes[1,0].set_xlabel('Time [s]', color='white')
+axes[1,0].set_ylabel('u_n_mps [m/s]', color='white')
+if np.linalg.norm(u_n_mps) < 1e-5:
+    axes[1,0].set_ylim(-0.05,0.05)
+axes[1,0].grid(True)
+axes[1,0].set_facecolor('black')
+axes[1,0].tick_params(colors = 'white')
+
+# v_n_mps
+axes[1,1].plot(t_s, v_n_mps, color='cyan')
+axes[1,1].set_xlabel('Time [s]', color='white')
+axes[1,1].set_ylabel('v_n_mps [m/s]', color='white')
+if np.linalg.norm(v_n_mps) < 1e-5:
+    axes[1,1].set_ylim(-0.05,0.05)
+axes[1,1].grid(True)
+axes[1,1].set_facecolor('black')
+axes[1,1].tick_params(colors = 'white')
+
+# w_n_mps
+axes[1,2].plot(t_s, w_n_mps, color='cyan')
+axes[1,2].set_xlabel('Time [s]', color='white')
+axes[1,2].set_ylabel('w_n_mps [m/s]', color='white')
+if np.linalg.norm(w_n_mps) < 1e-5:
+    axes[1,2].set_ylim(-0.05,0.05)
+axes[1,2].grid(True)
+axes[1,2].set_facecolor('black')
+axes[1,2].tick_params(colors = 'white')
+
+plt.tight_layout()
+if save_NED_plot == "on":  
+    plt.savefig(save_NED_plot_dir)
+plt.show(block=False)
+
+#############################################
+# AIR DATA
+#############################################
+fig, axes = plt.subplots(1, 4, figsize=(12, 4))
+fig.set_facecolor('black')  
+title_suffix = f"{vmod['V_Name']}"
+title_prefix = "Air Data\n"
+fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='magenta')
+
+# Angle of attack
+axes[0].plot(t_s, Alpha_rad*(180/math.pi), color='magenta')
+axes[0].set_xlabel('Time [s]', color='white')
+axes[0].set_ylabel('Angle of Attack [deg]', color='white')
+axes[0].set_ylim(-90,90)
+axes[0].grid(True)
+axes[0].set_facecolor('black')
+axes[0].tick_params(colors = 'white')
+
+# Angle of side slip
+axes[1].plot(t_s, Beta_rad*(180/math.pi), color='magenta')
+axes[1].set_xlabel('Time [s]', color='white')
+axes[1].set_ylabel('Angle of Side Slip [deg]', color='white')
+axes[1].set_ylim(-90,90)
+axes[1].grid(True)
+axes[1].set_facecolor('black')
+axes[1].tick_params(colors = 'white')
+
+# Mach
+axes[2].plot(t_s, Mach, color='magenta')
+axes[2].set_xlabel('Time [s]', color='white')
+axes[2].set_ylabel('Mach Number', color='white')
+axes[2].grid(True)
+axes[2].set_facecolor('black')
+axes[2].tick_params(colors = 'white')
+
+# Altitude vs Mach
+axes[3].plot(Mach, -x[11,:], color='magenta')
+axes[3].set_xlabel('Mach Number []', color='white')
+axes[3].set_ylabel('Altitude [m]', color='white')
+axes[3].grid(True)
+axes[3].set_facecolor('black')
+axes[3].tick_params(colors = 'white')
+
+plt.tight_layout()
+if save_air_data_plot == "on":  
+    plt.savefig(save_air_data_plot_dir)
 plt.show()
