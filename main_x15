@@ -17,10 +17,12 @@ from vehicle_models.X15 import X15
 mach0      = 3.4
 alpha0_deg = 0
 beta0_deg  = 0
-h0_ft      = 60000
+h0_ft      = 10000
+lat0_deg   = 32.335556
+lon0_deg   = -106.405833
 
 # Set initial condition
-u0_b_mps = mach0 * 294.4                 # set small to avoid dividing by zero in moment calculations
+u0_b_mps = mach0 * 294.9                 # set small to avoid dividing by zero in moment calculations
 v0_b_mps = 0
 w0_b_mps = 0
 p0_b_rps = 0   * math.pi / 180     # deg/s to rad/s
@@ -36,7 +38,7 @@ p30_NED_m = -h0_ft / 3.281         # ft to m
 # Set time conditions for integrator
 t0_s = 0.0  # initial time
 tf_s = 10.0 # final time (simulation length)
-h_s = 0.01  # time step
+h_s = 0.008  # time step
 
 # Get vehicle model
 vmod = X15.X15_mach3()
@@ -46,7 +48,7 @@ vmod = X15.X15_mach3()
 #=====================================================================================================
 # enable data saving & allocate the directory and format (.npy)
 save_data = 'on'
-save_dir = './my_saved_data/x15_test1/x15_test1.npy'
+save_dir = './my_saved_data/x15_test2/x15_test2.npy'
 
 # enable saving of certain plots
 save_6dof_plot = 'off'
@@ -56,16 +58,16 @@ save_air_data_plot = 'off'
 
 # name plots and save them to a folder
 name_6dof_plot = '6dof.png'
-save_6dof_plot_dir = './my_saved_data/x15_test1/saved_plots/' + name_6dof_plot
+save_6dof_plot_dir = './my_saved_data/x15_test2/saved_plots/' + name_6dof_plot
 
 name_euler_angle_plot = 'euler.png'
-save_euler_angle_plot_dir = './my_saved_data/x15_test1/saved_plots/' + name_euler_angle_plot
+save_euler_angle_plot_dir = './my_saved_data/x15_test2/saved_plots/' + name_euler_angle_plot
 
 name_NED_plot = 'NED.png'
-save_NED_plot_dir = './my_saved_data/x15_test1/saved_plots/' + name_NED_plot
+save_NED_plot_dir = './my_saved_data/x15_test2/saved_plots/' + name_NED_plot
 
 name_air_data_plot = 'air_data.png'
-save_air_data_plot_dir = './my_saved_data/x15_test1/saved_plots/' + name_air_data_plot
+save_air_data_plot_dir = './my_saved_data/x15_test2/saved_plots/' + name_air_data_plot
 
 #=====================================================================================================
 # INITIALIZE SIMULATION
@@ -208,25 +210,6 @@ Mach = np.zeros((nt_s,1))
 for i, element in enumerate(t_s):
     Mach[i,0] = True_Airspeed_mps[i,0] / Cs_mps[i,0]
 
-# Get auxillary data
-dele_deg = aux_data[1,:]
-dele_deg = dele_deg[:, np.newaxis]
-
-# Combine state date with time and other post processed data
-t_s = t_s[:, np.newaxis]
-sim_data = np.concatenate( (t_s, x.T, Altitude_m, Cs_mps, Rho_kgpm3, Mach, Alpha_rad, \
-                            Beta_rad, True_Airspeed_mps, C_phi, C_theta, C_psi, S_phi, \
-                            S_theta, S_psi, T_theta, phi_2_rad, theta_2_rad, psi_2_rad, \
-                            u_n_mps, v_n_mps, w_n_mps, dele_deg), axis=1 )
-
-# Save the state data, x_combined
-if save_data.lower() == "on":
-    np.save(save_dir, sim_data)
-
-#==============================================================================
-# Part 5: Plot data in figures
-#==============================================================================
-
 # Pointers so we plot the right data
 sel_state_u_b_mps   = 0
 sel_state_v_b_mps   = 1
@@ -245,6 +228,62 @@ sel_auxillary_data_dela_deg     = 0
 sel_auxillary_data_dele_deg     = 1
 sel_auxillary_data_delr_deg     = 2
 sel_auxillary_data_delt_percent = 3
+
+# Convert north and east position to geodetic latitude and longitude
+# Let p1_n_m = North change in distance [m]
+#     p2_n_m = East change in distance [m]
+#     p3_n_m = Down change in distance [m]
+#
+p1_n_m = x[sel_state_p1_n_m, :]
+p2_n_m = x[sel_state_p2_n_m, :]
+p3_n_m = x[sel_state_p3_n_m, :]
+
+
+# Equatorial radius of earth
+R = 6378137  
+
+# Earth flattening parameter
+f = 0.00335281
+
+# Compute change in latitude and longitude
+RN = R/(math.sqrt( 1 - (2*f - f**2)*math.sin(lat0_deg*(math.pi/180))**2 ) )
+RM = RN*( 1 - (2*f - f**2) )/( 1 - (2*f - f**2)*math.sin(lat0_deg*(math.pi/180))**2 ) 
+dlat_deg  = (p1_n_m - p10_NED_m)/RM*(180/math.pi)
+dlon_deg = (p2_n_m - p20_NED_m)/(RN*math.cos(lat0_deg*(math.pi/180)))*(180/math.pi)
+
+# Approximate latitude and longitude
+lat_deg  = lat0_deg  +  dlat_deg
+lon_deg = lon0_deg + dlon_deg
+
+# Get auxillary data 
+dela_deg        = aux_data[0,:]
+dela_deg        = dela_deg[:, np.newaxis]
+dele_deg        = aux_data[1,:]
+dele_deg        = dele_deg[:, np.newaxis]
+delr_deg        = aux_data[2,:]
+delr_deg        = delr_deg[:, np.newaxis]
+delt_percent    = aux_data[3,:]
+delt_percent    = delt_percent[:, np.newaxis]
+lat_deg         = lat_deg[:, np.newaxis]
+lon_deg        = lon_deg[:, np.newaxis]
+
+# Combine state date with time and other post processed data
+t_s = t_s[:, np.newaxis]
+sim_data = np.concatenate( (t_s, x.T, Altitude_m, Cs_mps, Rho_kgpm3, Mach, Alpha_rad, \
+                            Beta_rad, True_Airspeed_mps, C_phi, C_theta, C_psi, S_phi, \
+                            S_theta, S_psi, T_theta, phi_2_rad, theta_2_rad, psi_2_rad, \
+                            u_n_mps, v_n_mps, w_n_mps, dela_deg, dele_deg, delr_deg, \
+                            delt_percent, lat_deg, lon_deg), axis=1 )
+
+# Save the state data, x_combined
+if save_data.lower() == "on":
+    np.save(save_dir, sim_data)
+
+#==============================================================================
+# Part 5: Plot data in figures
+#==============================================================================
+
+r2d = 180 / math.pi
 
 # A. Create figure of translational and rotation states (6 DOF States in the body coordinate system)
 fig, axes = plt.subplots(2, 3, figsize=(10, 6))
@@ -280,7 +319,7 @@ axes[0, 2].set_facecolor('black')
 axes[0, 2].tick_params(colors = 'white')
 
 # Roll rate p^b_b/n
-axes[1, 0].plot(t_s, (180/math.pi)*x[sel_state_p_b_rps,:], color='yellow')
+axes[1, 0].plot(t_s, r2d*x[sel_state_p_b_rps,:], color='yellow')
 axes[1, 0].set_xlabel('Time [s]', color='white')
 axes[1, 0].set_ylabel('Roll Rate Body [deg/s]', color='white')
 axes[1, 0].grid(True)
@@ -288,7 +327,7 @@ axes[1, 0].set_facecolor('black')
 axes[1, 0].tick_params(colors = 'white')
 
 # Pitch rate q^b_b/n
-axes[1, 1].plot(t_s, (180/math.pi)*x[sel_state_q_b_rps,:], color='yellow')
+axes[1, 1].plot(t_s, r2d*x[sel_state_q_b_rps,:], color='yellow')
 axes[1, 1].set_xlabel('Time [s]', color='white')
 axes[1, 1].set_ylabel('Pitch Rate Body [deg/s]', color='white')
 axes[1, 1].grid(True)
@@ -296,7 +335,7 @@ axes[1, 1].set_facecolor('black')
 axes[1, 1].tick_params(colors = 'white')
 
 # Yaw rate r^b_b/n
-axes[1, 2].plot(t_s, (180/math.pi)*x[sel_state_r_b_rps,:], color='yellow')
+axes[1, 2].plot(t_s, r2d*x[sel_state_r_b_rps,:], color='yellow')
 axes[1, 2].set_xlabel('Time [s]', color='white')
 axes[1, 2].set_ylabel('Yaw Rate Body [deg/s]', color='white')
 axes[1, 2].grid(True)
@@ -316,7 +355,7 @@ title_prefix = "Euler Angles (Attitude)\n"
 fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='yellow')
 
 # Roll angle, phi
-axes[0].plot(t_s, (180/math.pi)*phi_2_rad, color='yellow')
+axes[0].plot(t_s, r2d*phi_2_rad, color='yellow')
 axes[0].set_xlabel('Time [s]', color='white')
 axes[0].set_ylabel('Roll Angle [deg]', color='white')
 axes[0].grid(True)
@@ -324,7 +363,7 @@ axes[0].set_facecolor('black')
 axes[0].tick_params(colors = 'white')
 
 # Pitch angle, theta
-axes[1].plot(t_s, (180/math.pi)*theta_2_rad, color='yellow')
+axes[1].plot(t_s, r2d*theta_2_rad, color='yellow')
 axes[1].set_xlabel('Time [s]', color='white')
 axes[1].set_ylabel('Pitch Angle [deg]', color='white')
 axes[1].grid(True)
@@ -332,7 +371,7 @@ axes[1].set_facecolor('black')
 axes[1].tick_params(colors = 'white')
 
 # Yaw angle, theta
-axes[2].plot(t_s, (180/math.pi)*psi_2_rad, color='yellow')
+axes[2].plot(t_s, r2d*psi_2_rad, color='yellow')
 axes[2].set_xlabel('Time [s]', color='white')
 axes[2].set_ylabel('Yaw Angle [deg]', color='white')
 axes[2].grid(True)
@@ -424,19 +463,19 @@ title_prefix = "Aerodynamic State and Control Effects\n"
 fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='magenta')
 
 # Angle of attack
-axes[0,0].plot(t_s, Alpha_rad*(180/math.pi), color='magenta')
+axes[0,0].plot(t_s, Alpha_rad*r2d, color='magenta')
 axes[0,0].set_xlabel('Time [s]', color='white')
 axes[0,0].set_ylabel('Angle of Attack [deg]', color='white')
-axes[0,0].set_ylim(-100,100)
+axes[0,0].set_ylim(-30,30)
 axes[0,0].grid(True)
 axes[0,0].set_facecolor('black')
 axes[0,0].tick_params(colors = 'white')
 
 # Angle of side slip
-axes[0,1].plot(t_s, Beta_rad*(180/math.pi), color='magenta')
+axes[0,1].plot(t_s, Beta_rad*r2d, color='magenta')
 axes[0,1].set_xlabel('Time [s]', color='white')
 axes[0,1].set_ylabel('Angle of Side Slip [deg]', color='white')
-axes[0,1].set_ylim(-90,90)
+axes[0,1].set_ylim(-30,30)
 axes[0,1].grid(True)
 axes[0,1].set_facecolor('black')
 axes[0,1].tick_params(colors = 'white')
@@ -461,7 +500,7 @@ axes[0,3].tick_params(colors = 'white')
 axes[1,0].plot(t_s, aux_data[sel_auxillary_data_dela_deg,:], color='magenta')
 axes[1,0].set_xlabel('Time [s]', color='white')
 axes[1,0].set_ylabel('Aileron [deg]', color='white')
-axes[1,0].set_ylim(-30,30)
+axes[1,0].set_ylim(-10,10)
 axes[1,0].grid(True)
 axes[1,0].set_facecolor('black')
 axes[1,0].tick_params(colors = 'white')
@@ -470,7 +509,7 @@ axes[1,0].tick_params(colors = 'white')
 axes[1,1].plot(t_s, aux_data[sel_auxillary_data_dele_deg,:], color='magenta')
 axes[1,1].set_xlabel('Time [s]', color='white')
 axes[1,1].set_ylabel('Elevator [deg]', color='white')
-axes[1,1].set_ylim(-30,30)
+axes[1,1].set_ylim(-10,10)
 axes[1,1].grid(True)
 axes[1,1].set_facecolor('black')
 axes[1,1].tick_params(colors = 'white')
@@ -479,7 +518,7 @@ axes[1,1].tick_params(colors = 'white')
 axes[1,2].plot(t_s, aux_data[sel_auxillary_data_delr_deg,:], color='magenta')
 axes[1,2].set_xlabel('Time [s]', color='white')
 axes[1,2].set_ylabel('Rudder', color='white')
-axes[1,2].set_ylim(-30,30)
+axes[1,2].set_ylim(-10,10)
 axes[1,2].grid(True)
 axes[1,2].set_facecolor('black')
 axes[1,2].tick_params(colors = 'white')
@@ -496,4 +535,38 @@ axes[1,3].tick_params(colors = 'white')
 plt.tight_layout()
 if save_air_data_plot == "on":  
     plt.savefig(save_air_data_plot_dir)
+plt.show(block=False)
+
+# E. Create figure of latitude, longitude, and altitudes versus time
+fig, axes = plt.subplots(1, 3, figsize=(10, 3))
+fig.set_facecolor('black')  
+title_suffix = f"{vmod['V_name']}"
+title_prefix = "Geodetic Position\n"
+fig.suptitle(title_prefix + title_suffix, fontsize=14, fontweight='normal', color='yellow')
+
+# Latitude (deg)
+axes[0].plot(t_s, lat_deg, color='yellow')
+axes[0].set_xlabel('Time [s]', color='white')
+axes[0].set_ylabel('Latitude [deg]', color='white')
+axes[0].grid(True)
+axes[0].set_facecolor('black')
+axes[0].tick_params(colors = 'white')
+
+# Longitude (deg)
+axes[1].plot(t_s, lon_deg, color='yellow')
+axes[1].set_xlabel('Time [s]', color='white')
+axes[1].set_ylabel('Longitude [deg]', color='white')
+axes[1].grid(True)
+axes[1].set_facecolor('black')
+axes[1].tick_params(colors = 'white')
+
+# Altitude
+axes[2].plot(t_s, -p3_n_m, color='yellow')
+axes[2].set_xlabel('Time [s]', color='white')
+axes[2].set_ylabel('Altitude [m]', color='white')
+axes[2].grid(True)
+axes[2].set_facecolor('black')
+axes[2].tick_params(colors = 'white')
+
+plt.tight_layout()
 plt.show()

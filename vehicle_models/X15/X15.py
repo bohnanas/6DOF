@@ -44,43 +44,43 @@ def X15_mach3():
         # Side force coefficients
         CYbeta_prad    = -0.02
         CYp_prps       = 0.017
-        CYr_prps       = 0
+        CYr_prps       = -0.92
         CYbetadot_pdps = 0
-        CYdela_pdeg    = 0
-        CYdelr_pdeg    = 0
+        CYdela_pdeg    = -0.0003
+        CYdelr_pdeg    = 0.0057
         
         # Roll moment coefficients
         Clbeta_prad    = 0
-        Clp_prps       = 0
-        Clr_prps       = 0
+        Clp_prps       = -0.185
+        Clr_prps       = -0.08
         Clbetadot_pdps = 0
-        Cldela_pdeg    = 0
-        Cldelr_pdeg    = 0
+        Cldela_pdeg    = 0.0007
+        Cldelr_pdeg    = 0.00025
         
         # Pitch moment coefficients
         Cmwb            = 0
         Cmalpha_pdeg    = -0.01
-        Cmq_prps        = -4.3
+        Cmq_prps        = -4.4
         Cmalphadot_pdps = -0.1
         Cmdele_pdeg     = -0.008 
         Cmdelsb_pdeg    = 0
         
         # Yaw moment coefficients
-        Cnbeta_pdeg     = -0.0046
-        Cnp_prps        = -0.01
-        Cnr_prps        = 0
+        Cnbeta_pdeg     = 0.0046
+        Cnp_prps        = -0.012
+        Cnr_prps        = -1.19
         Cnbetadot_pdps  = 0
-        Cndela_pdeg     = 0
-        Cndelr_pdeg     = 0
+        Cndela_pdeg     = 0.00045
+        Cndelr_pdeg     = -0.0039
         
         # Moments and products of inertia fully burned out (Yancey64)
-        Jyy_b_slugft2 = 88000
+        Jyy_b_slugft2 = 86000
         Jyy_b_kgm2 = Jyy_b_slugft2*1.355
-        Jzz_b_slugft2 = 85000
+        Jzz_b_slugft2 = 88500
         Jzz_b_kgm2 = Jzz_b_slugft2*1.355
-        Jxx_b_slugft2 = 3500
+        Jxx_b_slugft2 = 3600
         Jxx_b_kgm2 = Jxx_b_slugft2*1.355
-        Jxz_b_slugft2 = -500
+        Jxz_b_slugft2 = -700
         Jxz_b_kgm2 = Jxz_b_slugft2*1.355
 
         vmod = {"V_name"          : vehicle_name, 

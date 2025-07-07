@@ -94,20 +94,38 @@ def flat_earth_eom(t, x, vmod, amod):
     cn_ail_pdeg    = vmod["Cn_ail_pdeg"]
     cn_rud_pdeg    = vmod["Cn_rud_pdeg"]
 
-    # Control input data (2 degree doublet)
+    # Control input data (aileron doublet)
     ail_deg = 0
     elev_deg = 0
+    rud_deg = 0
 
     if t < 1:
-        elev_deg = 0
-    elif t < 2:
-        elev_deg = -2
+        ail_deg = 0
     elif t < 3:
-        elev_deg = 2
+        ail_deg = -0.25*0
+    elif t < 5:
+        ail_deg = 0.25*0
     else:
-        elev_Deg = 0
+        ail_deg = 0
+  
+    if t < 1:
+        elev_deg = 0
+    elif t < 3:
+        elev_deg = -2*0
+    elif t < 5:
+        elev_deg = 2*0
+    else:
+        elev_deg = 0
+  
+    if t < 1:
+        rud_deg = 0
+    elif t < 3:
+        rud_deg = -0.2
+    elif t < 5:
+        rud_deg = 0.2
+    else:
+        rud_deg = 0
 
-    rud_deg = 0
     sb_deg = 0
     thrust_percent = 0
 
