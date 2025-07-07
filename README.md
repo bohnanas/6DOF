@@ -8,6 +8,8 @@ Case 1: Dragless sphere dropped from altitude (verifies gravitational and transl
 Case 2: Dragless brick dropped from altitude with no damping (verifies rotational EOM)
 Case 3: Dragless brick dropped from altitude with damping (verifies inertial coupling)
 
-Added X-15 longitudinal dynamics, lateral to come
+Added X-15 longitudinal and lateral dynamics
 
 Added FlightGear visualization 
+
+Added lat/lon to flat earth sim
