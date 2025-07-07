@@ -1,6 +1,6 @@
 import numpy as np
 
-def rk4(f, t, x, h, vmod, amod):
+def rk4(f, t, x, h, vmod, amod, aux):
     ######################################################################################
     # Fourth-order Runge-Kutta ODE solver.
     
@@ -18,10 +18,15 @@ def rk4(f, t, x, h, vmod, amod):
     #######################################################################################
 
     for i in range(1, len(t)):
-        k1 = h * f(t[i-1], x[:,i-1], vmod, amod)
-        k2 = h * f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k1, vmod, amod)
-        k3 = h * f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k2, vmod, amod)
-        k4 = h * f(t[i-1] + h, x[:,i-1] + k3, vmod, amod) 
+        pk1, aux_data = f(t[i-1], x[:,i-1], vmod, amod)
+        k1 = h * pk1
+        pk2, _ = f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k1, vmod, amod)
+        k2 = h * pk2
+        pk3, _ = f(t[i-1] + 0.5 * h, x[:,i-1] + 0.5 * k2, vmod, amod)
+        k3 = h * pk3
+        pk4, _ = f(t[i-1] + h, x[:,i-1] + k3, vmod, amod) 
+        k4 = h * pk4
         x[:,i] = x[:,i-1] + 1.0/6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        aux[:,i] = aux_data
 
-    return t, x
+    return t, x, aux
